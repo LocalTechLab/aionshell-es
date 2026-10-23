@@ -12,5 +12,6 @@ La licencia no altera los derechos de los autores de dependencias, traducciones 
 
 ## Canales
 
+- Organización oficial en GitHub: https://github.com/LocalTechLab
 - YouTube: https://www.youtube.com/@LocalTechLab-d7e
 

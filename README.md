@@ -13,6 +13,8 @@ con el contenido educativo del laboratorio.
 
 📺 [YouTube · @LocalTechLab-d7e](https://www.youtube.com/@LocalTechLab-d7e)
 
+Repositorio oficial de la organización [Local Tech Lab](https://github.com/LocalTechLab).
+
 ## Qué ofrece
 
 - Ayuda de comandos y páginas de manual en español desde la terminal.
@@ -31,7 +33,7 @@ Probado en Debian 13, Linux x86_64, Python 3.13.5. Descarga e instala desde GitH
 
 ```bash
 sudo apt install git python3-venv man-db manpages-es
-git clone https://github.com/BEMC-GTRX/aionshell-es.git
+git clone https://github.com/LocalTechLab/aionshell-es.git
 cd aionshell-es
 sudo bash instalar-aionshell-es.sh
 aionshell-es --diagnostico
