@@ -21,26 +21,35 @@ import subprocess
 import sys
 import time
 
-VERSION_CACHE = 'aionshell-es-1'
+VERSION_CACHE = 'aionshell-es-2'
 CACHE_HOME = Path(os.environ.get('XDG_CACHE_HOME', str(Path.home() / '.cache'))) / 'aionshell-es'
 ANSI = re.compile(r'\x1b\[[0-?]*[ -/]*[@-~]')
 BACKSPACE = re.compile(r'[^\n]\x08')
+PROSA_TRAS_IDENTIFICADOR = re.compile(
+    r'(?:is|are|was|were|has|have|does|can|may|will|passes|supports|uses|'
+    r'reads|writes|provides|allows|requires|returns|transfers)\b')
 # Son literales de sintaxis técnica. Nunca deben pasar por el modelo.
 TOKENS = re.compile(
     r'`[^`\n]*`|'
+    r'"--?[^"\n]+"|'
     r"\binfo\s+'[^'\n]+'|"
     r'\bgit help (?:[a-z][a-z-]*|<[^>\n]+>)|'
     r"(?<!\w)'[^'\n]+'(?!\w)|"
     r'\(-[A-Za-z0-9][A-Za-z0-9-]*\)|'
     r'(?<!\w)[*/=><@|]{2,}(?!\w)|'
-    r'https?://[^\s<>]+|'
+    r'[A-Za-z][A-Za-z0-9+.-]*://[^\s<>]+|'
     r'<[^<>\n]{1,120}>|'
-    r'(?<![\w])--[A-Za-z][\w-]*(?:=(?:<[^<>\n]{1,120}>|[^\s,;]+))?|'
-    r'(?<![\w])-[A-Za-z][A-Za-z0-9-]*|'
+    r'\[[A-Za-z][A-Za-z0-9_-]*\]|'
+    r'(?<![\w])--[A-Za-z][\w.-]*(?:=(?:<[^<>\n]{1,120}>|[^\s,;]+))?|'
+    r'(?<![\w])-[A-Za-z0-9:#?][A-Za-z0-9-]*|'
     r'(?<!\w)(?:\d{1,3}\.){3}\d{1,3}(?:/\d{1,2})?|'
     r'(?<!\w)[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)+|'
     r'(?<!\w)/[A-Za-z0-9_./+-]+|'
-    r'\b(?:IPv4|IPv6|TCP|UDP|SCTP|ICMP|DNS|HTTP|HTTPS|FTP|SOCKS4|XML|'
+    r'\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b|'
+    r'\b(?:User-Agent|IPv4|IPv6|TCP|UDP|SCTP|ICMP|DNS|HTTP|HTTPS|FTP|SOCKS4|XML|'
+    r'GET|POST|PUT|DELETE|PATCH|OPTIONS|CONNECT|LIST|RETR|HELP|VRFY|'
+    r'PROPFIND|COPY|MOVE|USER|PROTOCOLS|PROTOCOL|FORMAT|RANGE|RATE|HASHES|'
+    r'URL|SSH|TLS|SSL|IMAP|POP3|SMTP|SFTP|SCP|TFTP|LDAP|'
     r'NSE|MAC|MTU|IDS|IP|shell|Shell|Bash|bash|'
     r'FILE|FILEs|FILES|PATTERN|PATTERNS|SIZE|WORD|WHEN|TYPE|ACTION|NUM|GLOB|SEP|LABEL|HEAD)\b'
 )
@@ -269,7 +278,7 @@ def partir_por_dos_puntos_fuera_de_sintaxis(cadena: str) -> int:
             stack.append(cierre[char])
         elif stack and char == stack[-1]:
             stack.pop()
-        elif char == ':' and not stack:
+        elif char == ':' and not stack and (i + 1 == len(cadena) or cadena[i + 1].isspace()):
             return i
     return -1
 
@@ -280,7 +289,10 @@ def es_ejemplo(linea: str, comando: str) -> bool:
     if re.match(r'(?i)^(ex:|e\.g\.:|examples?:|ejemplos?:)\s*\S+', t):
         return True
     if comando and re.match(r'^' + re.escape(Path(comando).name) + r'(?=\s|$)', t):
-        return True
+        resto = t[len(Path(comando).name):].lstrip()
+        # El nombre del programa también puede iniciar una explicación,
+        # como "curl passes on the verbatim string...".
+        return not PROSA_TRAS_IDENTIFICADOR.match(resto)
     # No tocar ni URLs ni líneas con prompts de shell.
     if re.match(r'^(?:\$|#|>>>|\./)\s*\S+', t):
         return True
@@ -307,7 +319,8 @@ def traducir_fragmento(fragmento: str, motor, db: sqlite3.Connection,
         traducido = motor.translate(texto)
     except Exception as exc:
         raise RuntimeError(f'Falló la traducción local de {texto[:70]!r}: {exc}') from exc
-    if not traducido or '\n' in traducido or '\r' in traducido:
+    if (not isinstance(traducido, str) or not traducido.strip()
+            or '\n' in traducido or '\r' in traducido):
         raise RuntimeError(f'El motor devolvió una traducción inválida para {texto[:70]!r}.')
     traducido = traducido.strip()
     if pendientes is not None:
@@ -348,12 +361,22 @@ def traducir_descripcion(texto: str, motor, db: sqlite3.Connection,
 
 def traducir_linea(linea: str, comando: str, motor, db: sqlite3.Connection,
                     renovar: bool, pendientes: dict[str, str] | None = None) -> str:
-    if not linea.strip() or es_ejemplo(linea, comando):
+    if not linea.strip():
         return linea
     # A diferencia de la traducción automática de bloques, aquí mantenemos
     # exactamente el número de líneas y la sintaxis técnica de cada opción.
     indent = linea[:len(linea) - len(linea.lstrip())]
     cuerpo = linea[len(indent):]
+    columna = re.match(r'([a-z][a-z0-9_-]*\s{2,})(\S.*)', cuerpo)
+    # Una categoría puede llamarse igual que el programa ("curl  The ...").
+    # Una columna descriptiva no es un ejemplo de ejecución.
+    if (columna and 0 < len(indent) <= 6
+            and (columna[1].strip() != Path(comando).name
+                 or ' '.join(columna[2].split()) in glosario(comando))):
+        return indent + columna[1] + traducir_descripcion(
+            columna[2], motor, db, renovar, comando, pendientes)
+    if es_ejemplo(linea, comando):
+        return linea
     if cuerpo.upper() in TITULOS:
         return indent + TITULOS[cuerpo.upper()]
     if re.match(r'(?i)^' + re.escape(Path(comando).name) + r'\s+\d', cuerpo):
@@ -368,6 +391,9 @@ def traducir_linea(linea: str, comando: str, motor, db: sqlite3.Connection,
     if re.match(r'(?i)^usage\s*:', cuerpo):
         return indent + re.sub(r'(?i)^usage\s*:', 'Uso:', cuerpo, count=1)
     if cuerpo.startswith('-'):
+        prosa = re.match(r'^(?:--[\w.-]+|-[A-Za-z0-9:#?])\s+(.*)', cuerpo)
+        if prosa and PROSA_TRAS_IDENTIFICADOR.match(prosa[1]):
+            return indent + traducir_descripcion(cuerpo, motor, db, renovar, comando, pendientes)
         i = partir_por_dos_puntos_fuera_de_sintaxis(cuerpo)
         espacio = re.search(r'\s{2,}(?=\S)', cuerpo)
         if espacio is not None and (i < 0 or espacio.start() < i):
@@ -380,11 +406,36 @@ def traducir_linea(linea: str, comando: str, motor, db: sqlite3.Connection,
             return linea
         return indent + cuerpo[:corte] + traducir_descripcion(
             cuerpo[corte:], motor, db, renovar, comando, pendientes)
-    columna = re.match(r'([a-z][a-z0-9_-]*\s{2,})(\S.*)', cuerpo)
-    if columna and 0 < len(indent) <= 6:
-        return indent + columna[1] + traducir_descripcion(
-            columna[2], motor, db, renovar, comando, pendientes)
     return indent + traducir_descripcion(cuerpo, motor, db, renovar, comando, pendientes)
+
+
+def es_continuacion_uso(linea: str, comando: str) -> bool:
+    """Distingue la gramática de uso de las opciones y la prosa que la siguen."""
+    cuerpo = linea.lstrip()
+    if not cuerpo:
+        return False
+    if re.match(r'^where\s+[A-Z]', cuerpo):
+        return True
+    if not linea[:1].isspace():
+        return False
+    if cuerpo.startswith('-'):
+        # Una opción con descripción termina el bloque Usage, incluso
+        # cuando curl no introduce una línea en blanco entre ambos.
+        return (re.search(r'\s{2,}(?=\S)', cuerpo) is None
+                and partir_por_dos_puntos_fuera_de_sintaxis(cuerpo) < 0)
+    return bool(re.match(r'^(?:[\[<{(|]|[A-Z][A-Z0-9_]*\s*[:=]|or:\s)', cuerpo)
+                or comando and re.match(
+                    re.escape(Path(comando).name) + r'(?=\s|$)', cuerpo))
+
+
+def actualizar_delimitadores_uso(linea: str, pendientes: list[str]) -> None:
+    """Mantiene los grupos de una gramática Usage que continúan en otra línea."""
+    cierre = {'[': ']', '{': '}', '(': ')', '<': '>'}
+    for char in linea:
+        if char in cierre:
+            pendientes.append(cierre[char])
+        elif pendientes and char == pendientes[-1]:
+            pendientes.pop()
 
 
 def traducir_ayuda(original: str, comando: str, refrescar: bool,
@@ -408,18 +459,22 @@ def traducir_ayuda(original: str, comando: str, refrescar: bool,
         salida = []
         pendientes: dict[str, str] = {}
         bloque_uso = False
+        delimitadores_uso: list[str] = []
         ultimo_aviso = time.monotonic()
         for numero, linea in enumerate(partes, 1):
             sin_fin = linea.rstrip('\r\n')
             terminador = linea[len(sin_fin):]
             if re.match(r'(?i)^\s*usage\s*:', sin_fin):
                 bloque_uso = True
+                delimitadores_uso.clear()
+                actualizar_delimitadores_uso(sin_fin, delimitadores_uso)
             elif bloque_uso:
-                if sin_fin.strip() and (sin_fin[:1].isspace() or
-                                       re.match(r'^where\s+[A-Z]', sin_fin)):
+                if sin_fin.strip() and (delimitadores_uso or es_continuacion_uso(sin_fin, comando)):
+                    actualizar_delimitadores_uso(sin_fin, delimitadores_uso)
                     salida.append(linea)
                     continue
                 bloque_uso = False
+                delimitadores_uso.clear()
             salida.append(traducir_linea(sin_fin, comando, motor, db, refrescar, pendientes)
                           + terminador)
             if progreso and time.monotonic() - ultimo_aviso >= 2:

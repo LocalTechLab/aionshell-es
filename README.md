@@ -82,6 +82,27 @@ aionshell-es nmap --tiempo
 aionshell-es nmap -- --script-help http-title
 ```
 
+### Ayuda de curl
+
+```bash
+aionshell-es curl
+aionshell-es curl -- --help all
+aionshell-es curl -- --help category
+aionshell-es curl -- --help http
+aionshell-es curl -- --help --request
+aionshell-es --original curl -- --help all
+```
+
+El glosario incluye las descripciones de las 269 opciones de `curl 8.14.1`,
+sus 25 categorías y los fragmentos de la ayuda detallada de `--request` probados
+con esa versión. Se conservan los nombres de opciones, categorías, métodos HTTP
+y ejemplos. Estas consultas se resuelven sin cargar el modelo cuando todos sus
+fragmentos coinciden con el glosario.
+
+Otras versiones, opciones detalladas o disposiciones del texto pueden contener
+frases distintas y utilizar el traductor local. La cobertura del glosario no
+equivale a una revisión de todo el manual de curl.
+
 El programa consultado debe estar instalado. `--man` necesita el nombre de un comando,
 `man-db` y la página correspondiente: `aionshell-es --man nmap`. Si el sistema dispone
 de un manual en español, se muestra directamente, sin cargar el modelo. Si no existe,
@@ -141,7 +162,7 @@ permita crear espacios de nombres de red.
 
 ## Revisión y mantenimiento
 
-El proyecto incluye 22 pruebas unitarias y un flujo de GitHub Actions para comprobar
+El proyecto incluye 35 pruebas unitarias y un flujo de GitHub Actions para comprobar
 la sintaxis y ejecutar las pruebas. Estas comprobaciones no sustituyen la validación
 de una instalación completa en el equipo de destino.
 

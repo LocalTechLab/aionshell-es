@@ -199,6 +199,132 @@ class PruebasAyuda(unittest.TestCase):
                             continue  # Abreviaturas de prosa, no sintaxis técnica.
                         self.assertIn(token, destino)
 
+    def test_usage_no_oculta_opciones_sin_linea_en_blanco(self):
+        original = ('Usage: demo [options...] <url>\n'
+                    ' -d, --data <data>           Send example values\n'
+                    ' -v, --verbose              Explain the operation\n')
+        with tempfile.TemporaryDirectory() as tmp, patch.object(app, 'CACHE_HOME', Path(tmp)):
+            with patch.object(app, 'obtener_motor', return_value=self.motor):
+                salida = app.traducir_ayuda(original, 'demo', True)
+        self.assertEqual(salida, 'Uso: demo [options...] <url>\n'
+                         ' -d, --data <data>           texto traducido\n'
+                         ' -v, --verbose              texto traducido\n')
+        self.assertEqual(self.motor.entradas, ['Send example values', 'Explain the operation'])
+
+    def test_usage_no_oculta_prosa_indentada(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(app, 'CACHE_HOME', Path(tmp)):
+            with patch.object(app, 'obtener_motor', return_value=self.motor):
+                salida = app.traducir_ayuda('Usage: demo [options]\n  Additional information\n',
+                                           'demo', True)
+        self.assertEqual(salida, 'Uso: demo [options]\n  texto traducido\n')
+        self.assertEqual(self.motor.entradas, ['Additional information'])
+
+    def test_gramatica_ip_multilinea_conserva_alternativas(self):
+        original = ('Usage: ip [ OPTIONS ] OBJECT { COMMAND | help }\n'
+                    '       ip [ -force ] -batch filename\n'
+                    'where  OBJECT := { address | link |\n'
+                    '                   macsec | maddress | mptcp |\n'
+                    '                   neigh | neighbor | netconf |\n'
+                    '                   token | tunnel | tuntap }\n'
+                    '       OPTIONS := { -4 | -6 |\n'
+                    '                    -c[olor]}\n')
+        with tempfile.TemporaryDirectory() as tmp, patch.object(app, 'CACHE_HOME', Path(tmp)):
+            with patch.object(app, 'obtener_motor') as motor:
+                self.assertEqual(app.traducir_ayuda(original, 'ip', True),
+                                 original.replace('Usage:', 'Uso:', 1))
+                motor.assert_not_called()
+
+    def test_gramatica_abierta_no_salta_prosa_tras_linea_vacia(self):
+        original = 'Usage: demo { choices\n\n  Additional information\n'
+        with tempfile.TemporaryDirectory() as tmp, patch.object(app, 'CACHE_HOME', Path(tmp)):
+            with patch.object(app, 'obtener_motor', return_value=self.motor):
+                salida = app.traducir_ayuda(original, 'demo', True)
+        self.assertEqual(salida, 'Uso: demo { choices\n\n  texto traducido\n')
+        self.assertEqual(self.motor.entradas, ['Additional information'])
+
+    def test_opcion_corta_dos_puntos_no_se_confunde_con_separador(self):
+        linea = ' -:, --next                        Start another operation'
+        salida = app.traducir_linea(linea, 'demo', self.motor, self.db, False)
+        self.assertEqual(salida, ' -:, --next                        texto traducido')
+        self.assertEqual(self.motor.entradas, ['Start another operation'])
+
+    def test_prosa_que_empieza_por_opcion_no_se_confunde_con_sintaxis(self):
+        original = '    --output is associated with one destination.  Use it once.'
+        salida = app.traducir_linea(original, 'curl', self.motor, self.db, False)
+        self.assertEqual(salida, '    --output texto traducido')
+        self.assertEqual(self.motor.entradas,
+                         ['is associated with one destination.  Use it once.'])
+
+    def test_comandos_entre_comillas_y_metodos_no_se_traducen(self):
+        texto = ('Use "--help category" or "--help [option]" with --http1.1, '
+                 '-4, -:, GET, POST, TCP_NODELAY and ftp://example.com/path')
+        salida = app.traducir_descripcion(texto, self.motor, self.db, False, 'demo')
+        enviados = ' '.join(self.motor.entradas)
+        for literal in ['"--help category"', '"--help [option]"', '--http1.1', '-4', '-:',
+                        'GET', 'POST', 'TCP_NODELAY', 'ftp://example.com/path']:
+            self.assertIn(literal, salida)
+            self.assertNotIn(literal, enviados)
+
+    def test_categoria_con_nombre_del_programa_se_traduce(self):
+        linea = ' curl        The command line tool itself'
+        self.assertEqual(app.traducir_linea(linea, 'curl', self.motor, self.db, False),
+                         ' curl        La propia herramienta de línea de comandos')
+        self.assertEqual(self.motor.entradas, [])
+
+    def test_nombre_programa_en_prosa_no_es_ejemplo(self):
+        salida = app.traducir_linea('    curl supports additional operations.',
+                                   'curl', self.motor, self.db, False)
+        self.assertEqual(salida, '    curl texto traducido')
+        self.assertEqual(self.motor.entradas, ['supports additional operations.'])
+
+    def test_ejemplos_curl_con_espacios_se_conservan(self):
+        for ejemplo in [' curl -X "DELETE" https://example.com',
+                        ' curl  -X NLST ftp://example.com/',
+                        ' curl  MyFile', ' git  status']:
+            with self.subTest(ejemplo=ejemplo):
+                comando = ejemplo.split()[0]
+                self.assertEqual(app.traducir_linea(ejemplo, comando, self.motor,
+                                                   self.db, False), ejemplo)
+        self.assertEqual(self.motor.entradas, [])
+
+    def test_motor_invalido_no_se_guarda(self):
+        for invalido in [' ', '\t', None, 7, 'una\notra']:
+            with self.subTest(invalido=invalido):
+                pendientes = {}
+                with patch.object(self.motor, 'translate', return_value=invalido):
+                    with self.assertRaisesRegex(RuntimeError, 'traducción inválida'):
+                        app.traducir_fragmento('Unseen text', self.motor, self.db, True, pendientes)
+                self.assertEqual(pendientes, {})
+        self.assertEqual(self.db.execute('SELECT COUNT(*) FROM segmentos').fetchone()[0], 0)
+
+    def test_fallo_a_mitad_no_publica_cache_parcial(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(app, 'CACHE_HOME', Path(tmp)):
+            with patch.object(app, 'obtener_motor', return_value=self.motor):
+                with patch.object(self.motor, 'translate', side_effect=['bien', '   ']):
+                    with self.assertRaises(RuntimeError):
+                        app.traducir_ayuda('First unknown sentence\nSecond unknown sentence\n',
+                                           'demo', True)
+            self.assertEqual(list(Path(tmp).glob('*.txt')), [])
+            with contextlib.closing(sqlite3.connect(next(Path(tmp).glob('*.sqlite3')))) as db:
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM segmentos').fetchone()[0], 0)
+
+    def test_curl_sentidos_tecnicos_y_argumentos(self):
+        casos = {
+            'HTTP POST data': 'Envía datos mediante HTTP POST',
+            'Wait time between retries': 'Tiempo de espera entre reintentos',
+            'Show version number and quit': 'Muestra el número de versión y finaliza',
+            'Output FORMAT after completion': 'Muestra FORMAT al finalizar',
+            'Require TLS for login, clear for transfer':
+                'Exige TLS para iniciar sesión y transfiere los datos sin cifrar',
+            'Do not switch to GET after a 301 redirect':
+                'No cambia a GET después de una redirección 301',
+        }
+        for original, esperado in casos.items():
+            with self.subTest(original=original):
+                self.assertEqual(app.traducir_descripcion(original, self.motor, self.db,
+                                                         False, 'curl'), esperado)
+        self.assertEqual(self.motor.entradas, [])
+
 
 if __name__ == '__main__':
     unittest.main()
