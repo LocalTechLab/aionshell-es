@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+*.argosmodel
+*.zip
+*.zip.sha256
+paquete/
+verificacion/
+.pytest_cache/
+*.egg-info/
+dist/
+build/

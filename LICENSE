@@ -1,0 +1,60 @@
+LICENCIA DE USO EDUCATIVO LOCAL TECH LAB — VERSIÓN 1.0
+AionShell ES (aionshell-es)
+
+Copyright © 2026 Local Tech Lab. Todos los derechos reservados.
+
+1. TITULARIDAD
+Esta licencia se ofrece para el código original de AionShell ES distribuido
+por su titular bajo la identidad de proyecto Local Tech Lab. El permiso de uso
+no transfiere titularidad, autoría ni derechos de propiedad intelectual. La
+atribución «AionShell ES — desarrollado en Local Tech Lab» y este aviso de
+derechos de autor deben mantenerse en toda copia permitida.
+
+2. PERMISOS DE USO
+Sin pagar regalías, se concede a cualquier persona una autorización limitada,
+no exclusiva, no transferible y no sublicenciable para:
+  a) visualizar y descargar o clonar el repositorio oficial;
+  b) instalar y ejecutar el programa en sus propios equipos con fines
+     personales, académicos, de aprendizaje o investigación no comercial;
+  c) leer, estudiar y modificar el código exclusivamente para su uso privado
+     no comercial, manteniendo este archivo y los avisos de atribución.
+Puede compartirse un ENLACE al repositorio oficial sin solicitar permiso.
+
+3. USOS NO AUTORIZADOS SIN PERMISO ESCRITO DEL TITULAR
+Salvo que una ley aplicable lo permita de forma irrenunciable, queda prohibido:
+  a) vender, alquilar, sublicenciar o explotar comercialmente el código,
+     versiones modificadas o productos que lo incorporen;
+  b) redistribuir, publicar, empaquetar, hospedar para descarga o poner a
+     disposición copias del código, sus versiones modificadas o derivados,
+     incluidos los que cambian el nombre o retiran los avisos;
+  c) afirmar que una versión modificada es una publicación oficial de Local
+     Tech Lab, o utilizar su identidad visual para inducir a confusión;
+  d) retirar u ocultar los avisos de autoría o esta licencia.
+Los permisos adicionales, incluido el uso comercial, deben acordarse por
+escrito con quien tenga los derechos correspondientes.
+
+4. SOFTWARE Y CONTENIDO DE TERCEROS
+Esta licencia cubre únicamente los componentes originales respecto de los
+cuales el titular puede otorgar derechos. No modifica ni sustituye las
+licencias de Argos Translate, PyTorch, Stanza, modelos lingüísticos,
+componentes del sistema operativo o páginas de manual de terceros. Esas
+licencias prevalecen sobre sus respectivos materiales. No se incluyen sus
+binarios ni modelos en este repositorio.
+
+5. INCUMPLIMIENTO
+Los permisos de los apartados 2 y 3 terminan automáticamente si el usuario
+incumple sus condiciones, sin perjuicio de otros derechos legales aplicables.
+
+6. GARANTÍA Y RESPONSABILIDAD
+EL SOFTWARE SE PROPORCIONA «TAL CUAL», SIN GARANTÍAS EXPRESAS NI IMPLÍCITAS,
+EN LA MEDIDA PERMITIDA POR LA LEY. EL TITULAR NO RESPONDERÁ POR DAÑOS
+DERIVADOS DEL USO DEL SOFTWARE EN LA MEDIDA PERMITIDA POR LA LEY.
+
+7. ACLARACIÓN
+Esta licencia autoriza uso educativo no comercial, pero NO es una licencia
+de código abierto aprobada por OSI. La publicación pública del código no
+concede permisos más amplios que los aquí establecidos y aquellos impuestos
+por la ley o las condiciones aplicables de la plataforma GitHub.
+
+Para solicitar una licencia diferente, contacta al titular a través de los
+canales oficiales de Local Tech Lab.
